@@ -22,4 +22,10 @@ export function registerCommands(plugin: YuelingSyncPlugin): void {
 		name: '打开同步目录',
 		callback: () => plugin.openSyncFolder(),
 	});
+
+	plugin.addCommand({
+		id: 'open-settings',
+		name: '打开同步设置',
+		callback: () => plugin.openSettings(),
+	});
 }

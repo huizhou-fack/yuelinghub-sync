@@ -1,4 +1,4 @@
-import { Notice, Plugin } from 'obsidian';
+import { Notice, Plugin, setTooltip } from 'obsidian';
 import { registerCommands } from './commands';
 import {
 	DEFAULT_SETTINGS,
@@ -13,11 +13,24 @@ interface PluginData {
 	syncState: SyncState;
 }
 
+interface AppWithSetting {
+	setting: {
+		open: () => void;
+		openTabById: (id: string) => void;
+	};
+}
+
+function getAppSetting(app: unknown): AppWithSetting['setting'] {
+	return (app as AppWithSetting).setting;
+}
+
 export default class YuelingSyncPlugin extends Plugin {
 	settings: YuelingSyncSettings = DEFAULT_SETTINGS;
 	syncState: SyncState = { ...DEFAULT_SYNC_STATE };
 	syncEngine!: SyncEngine;
 	statusBarItem: HTMLElement;
+	statusBarText: HTMLElement;
+	statusBarSettings: HTMLElement;
 	private autoSyncTimer: number | null = null;
 
 	async onload() {
@@ -35,6 +48,18 @@ export default class YuelingSyncPlugin extends Plugin {
 		});
 
 		this.statusBarItem = this.addStatusBarItem();
+		this.statusBarItem.addClass('yuelinghub-sync-status-bar');
+		this.statusBarText = this.statusBarItem.createSpan({ cls: 'yuelinghub-sync-status-text' });
+		this.statusBarSettings = this.statusBarItem.createSpan({
+			cls: 'yuelinghub-sync-settings-link',
+			text: '设置',
+		});
+		setTooltip(this.statusBarSettings, '打开阅灵同步设置');
+		this.statusBarSettings.setAttr('aria-label', '打开阅灵同步设置');
+		this.registerDomEvent(this.statusBarSettings, 'click', (event: MouseEvent) => {
+			event.stopPropagation();
+			this.openSettings();
+		});
 		this.updateStatusBar('就绪');
 
 		registerCommands(this);
@@ -53,7 +78,13 @@ export default class YuelingSyncPlugin extends Plugin {
 	}
 
 	updateStatusBar(message: string): void {
-		this.statusBarItem.setText(`阅灵: ${message}`);
+		this.statusBarText.setText(`阅灵: ${message}`);
+	}
+
+	openSettings(): void {
+		const setting = getAppSetting(this.app);
+		setting.open();
+		setting.openTabById(this.manifest.id);
 	}
 
 	async runSync(): Promise<void> {
@@ -136,6 +167,9 @@ export default class YuelingSyncPlugin extends Plugin {
 	private async loadPluginData(): Promise<void> {
 		const data = await this.loadData() as Partial<PluginData> | null;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data?.settings);
+		if ((this.settings.syncMode as string) === 'tag') {
+			this.settings.syncMode = 'all';
+		}
 		this.syncState = Object.assign({}, DEFAULT_SYNC_STATE, data?.syncState);
 		if (data?.syncState?.syncedPosts) {
 			this.syncState.syncedPosts = { ...data.syncState.syncedPosts };

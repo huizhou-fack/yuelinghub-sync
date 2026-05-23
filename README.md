@@ -5,7 +5,7 @@
 ## 功能
 
 - 从阅灵 API 拉取文章并保存为 Markdown
-- 支持多种同步范围：全部已关注、仅收藏、按分组、按标签
+- 支持多种同步范围：全部已关注、仅收藏、按分组
 - 增量同步（基于 `post_time`）
 - 完整正文（HTML 转 Markdown）+ frontmatter 摘要
 - 手动同步、定时同步、冲突策略（跳过/覆盖）
@@ -36,7 +36,7 @@ npm run build # 生产构建
 1. 在小程序或 web 管理端获取用户 token（`POST /api/wx/get_token`）
 2. 打开 **Settings → Community plugins → 阅灵同步**
 3. 填写 API 地址和用户令牌
-4. 点击 **验证并刷新** 加载分组/标签
+4. 点击 **验证并刷新** 加载分组
 5. 选择同步模式与目标文件夹
 6. 执行 **立即同步文章** 命令，或点击左侧 ribbon 下载图标
 
@@ -46,7 +46,7 @@ npm run build # 生产构建
 阅灵/{公众号名称}/{YYYY-MM-DD} {标题}.md
 ```
 
-Frontmatter 包含 `yueling_id`、`title`、`source`、`url`、`published`、`summary`、`tags` 等字段。
+Frontmatter 包含 `yueling_id`、`title`、`source`、`url`、`published`、`summary`、`groups`、`tags` 等字段。
 
 ## 命令
 
@@ -55,6 +55,9 @@ Frontmatter 包含 `yueling_id`、`title`、`source`、`url`、`published`、`su
 | 立即同步文章 | 手动触发同步 |
 | 重置同步状态 | 清空增量记录，下次重新拉取 |
 | 打开同步目录 | 打开最近同步的文章 |
+| 打开同步设置 | 进入阅灵同步设置页 |
+
+底部状态栏显示同步状态，点击 **设置** 可快速进入插件设置。
 
 ## 后端 API
 

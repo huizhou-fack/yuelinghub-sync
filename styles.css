@@ -1,8 +1,15 @@
-/*
+.yuelinghub-sync-status-bar {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35em;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.yuelinghub-sync-settings-link {
+	cursor: pointer;
+	color: var(--text-accent);
+}
 
-If your plugin does not need CSS, delete this file.
-
-*/
+.yuelinghub-sync-settings-link:hover {
+	color: var(--text-accent-hover);
+	text-decoration: underline;
+}

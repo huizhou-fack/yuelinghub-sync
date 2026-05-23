@@ -65,7 +65,6 @@ export class YuelingApiClient {
 		token: string;
 		mode: SyncMode;
 		groupId: number;
-		tagIds: number[];
 		since: number;
 		cursor: number;
 		limit?: number;
@@ -74,7 +73,6 @@ export class YuelingApiClient {
 			token: params.token,
 			mode: params.mode,
 			group_id: params.groupId,
-			tag_ids: params.tagIds,
 			since: params.since,
 			cursor: params.cursor,
 			limit: params.limit ?? 30,

@@ -1,7 +1,8 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type YuelingSyncPlugin from './main';
-import { MetaGroup, MetaTag, SyncMode } from './types';
+import { MetaGroup, SyncMode } from './types';
 import { ApiError, YuelingApiClient } from './api/client';
+import { resolveDefaultGroupId } from './sync/validation';
 
 export interface YuelingSyncSettings {
 	apiBaseUrl: string;
@@ -9,7 +10,6 @@ export interface YuelingSyncSettings {
 	targetFolder: string;
 	syncMode: SyncMode;
 	groupId: number;
-	tagIds: number[];
 	folderBySource: boolean;
 	autoSyncIntervalMin: number;
 	onConflict: 'skip' | 'overwrite';
@@ -22,7 +22,6 @@ export const DEFAULT_SETTINGS: YuelingSyncSettings = {
 	targetFolder: '阅灵',
 	syncMode: 'all',
 	groupId: 0,
-	tagIds: [],
 	folderBySource: true,
 	autoSyncIntervalMin: 0,
 	onConflict: 'skip',
@@ -32,7 +31,6 @@ export const DEFAULT_SETTINGS: YuelingSyncSettings = {
 export class YuelingSettingTab extends PluginSettingTab {
 	plugin: YuelingSyncPlugin;
 	private groups: MetaGroup[] = [];
-	private tags: MetaTag[] = [];
 
 	constructor(app: App, plugin: YuelingSyncPlugin) {
 		super(app, plugin);
@@ -69,7 +67,7 @@ export class YuelingSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('验证 token')
-			.setDesc('验证 token 并加载分组/标签列表')
+			.setDesc('验证 token 并加载分组列表')
 			.addButton((button) => button
 				.setButtonText('验证并刷新')
 				.onClick(async () => {
@@ -94,10 +92,15 @@ export class YuelingSettingTab extends PluginSettingTab {
 				.addOption('all', '全部已关注文章')
 				.addOption('collected', '仅收藏')
 				.addOption('group', '按分组')
-				.addOption('tag', '按标签')
 				.setValue(this.plugin.settings.syncMode)
 				.onChange(async (value) => {
 					this.plugin.settings.syncMode = value as SyncMode;
+					if (value === 'group') {
+						const groupId = resolveDefaultGroupId(this.plugin.settings, this.groups);
+						if (groupId > 0) {
+							this.plugin.settings.groupId = groupId;
+						}
+					}
 					await this.plugin.saveSettings();
 					this.display();
 				}));
@@ -110,41 +113,21 @@ export class YuelingSettingTab extends PluginSettingTab {
 			if (this.groups.length === 0) {
 				groupSetting.setDesc('请先验证 token 以加载分组列表');
 			} else {
+				const selectedGroupId = resolveDefaultGroupId(this.plugin.settings, this.groups);
+				if (selectedGroupId > 0 && this.plugin.settings.groupId !== selectedGroupId) {
+					this.plugin.settings.groupId = selectedGroupId;
+					void this.plugin.saveSettings();
+				}
+
 				groupSetting.addDropdown((dropdown) => {
 					for (const group of this.groups) {
 						dropdown.addOption(String(group.id), group.name);
 					}
-					dropdown.setValue(String(this.plugin.settings.groupId || this.groups[0]?.id || 0));
+					dropdown.setValue(String(selectedGroupId));
 					dropdown.onChange(async (value) => {
 						this.plugin.settings.groupId = Number(value);
 						await this.plugin.saveSettings();
 					});
-				});
-			}
-		}
-
-		if (this.plugin.settings.syncMode === 'tag') {
-			new Setting(containerEl)
-				.setName('标签 ID')
-				.setDesc('输入要同步的标签 ID，多个用英文逗号分隔')
-				.addText((text) => text
-					.setPlaceholder('1,2,3')
-					.setValue(this.plugin.settings.tagIds.join(','))
-					.onChange(async (value) => {
-						this.plugin.settings.tagIds = value
-							.split(',')
-							.map((item) => Number(item.trim()))
-							.filter((item) => !Number.isNaN(item) && item > 0);
-						await this.plugin.saveSettings();
-					}));
-
-			if (this.tags.length > 0) {
-				const tagNames = this.tags
-					.map((tag) => `${tag.name} (${tag.id})`)
-					.join('、');
-				containerEl.createEl('p', {
-					cls: 'setting-item-description',
-					text: `可用标签：${tagNames}`,
 				});
 			}
 		}
@@ -215,7 +198,13 @@ export class YuelingSettingTab extends PluginSettingTab {
 			const auth = await client.authorize(token);
 			const meta = await client.fetchMeta(token);
 			this.groups = meta.groups;
-			this.tags = meta.tags;
+			if (this.plugin.settings.syncMode === 'group') {
+				const groupId = resolveDefaultGroupId(this.plugin.settings, this.groups);
+				if (groupId > 0) {
+					this.plugin.settings.groupId = groupId;
+					await this.plugin.saveSettings();
+				}
+			}
 			this.plugin.showNotice(`验证成功：${auth.nickname || auth.uid}`);
 			this.display();
 		} catch (error: unknown) {

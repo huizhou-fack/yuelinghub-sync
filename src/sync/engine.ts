@@ -4,6 +4,7 @@ import { SyncState, SyncResult, YuelingArticle } from '../types';
 import { ApiError, YuelingApiClient } from '../api/client';
 import { articleToMarkdown } from './mapper';
 import { buildArticlePath } from '../utils/filename';
+import { validateSyncSettings } from './validation';
 
 export class SyncEngine {
 	private syncing = false;
@@ -28,6 +29,7 @@ export class SyncEngine {
 		if (!settings.token.trim()) {
 			throw new Error('请先在设置中填写 token');
 		}
+		validateSyncSettings(settings);
 
 		this.syncing = true;
 		const result: SyncResult = {
@@ -43,18 +45,23 @@ export class SyncEngine {
 		let cursor = 0;
 		let hasMore = true;
 		let maxPostTime = syncState.lastSyncTime;
+		const missingCount = this.pruneMissingFiles(syncState);
+		const since = missingCount > 0 ? 0 : syncState.lastSyncTime;
 
 		try {
 			await client.authorize(settings.token);
-			onProgress?.('开始同步文章…');
+			if (missingCount > 0) {
+				onProgress?.(`检测到 ${missingCount} 篇本地笔记已删除，正在重新拉取…`);
+			} else {
+				onProgress?.('开始同步文章…');
+			}
 
 			while (hasMore) {
 				const response = await client.fetchArticles({
 					token: settings.token,
 					mode: settings.syncMode,
 					groupId: settings.groupId,
-					tagIds: settings.tagIds,
-					since: syncState.lastSyncTime,
+					since,
 					cursor,
 				});
 
@@ -104,8 +111,7 @@ export class SyncEngine {
 		syncState: SyncState,
 	): Promise<'created' | 'updated' | 'skipped'> {
 		const articleKey = String(article.id);
-		const existingPath = syncState.syncedPosts[articleKey];
-		const targetPath = buildArticlePath(
+		let pathToUse = syncState.syncedPosts[articleKey] || buildArticlePath(
 			settings.targetFolder,
 			article.source_name,
 			article.title,
@@ -113,10 +119,21 @@ export class SyncEngine {
 			settings.folderBySource,
 		);
 
-		const pathToUse = existingPath || targetPath;
-		const file = this.app.vault.getAbstractFileByPath(pathToUse);
+		let file = this.app.vault.getAbstractFileByPath(pathToUse);
+		if (!file && syncState.syncedPosts[articleKey]) {
+			delete syncState.syncedPosts[articleKey];
+			pathToUse = buildArticlePath(
+				settings.targetFolder,
+				article.source_name,
+				article.title,
+				article.post_time,
+				settings.folderBySource,
+			);
+			file = this.app.vault.getAbstractFileByPath(pathToUse);
+		}
 
 		if (file instanceof TFile && settings.onConflict === 'skip') {
+			syncState.syncedPosts[articleKey] = file.path;
 			return 'skipped';
 		}
 
@@ -136,6 +153,20 @@ export class SyncEngine {
 		const created = await this.app.vault.create(pathToUse, content);
 		syncState.syncedPosts[articleKey] = created.path;
 		return 'created';
+	}
+
+	private pruneMissingFiles(syncState: SyncState): number {
+		let removed = 0;
+
+		for (const [articleId, filePath] of Object.entries(syncState.syncedPosts)) {
+			const file = this.app.vault.getAbstractFileByPath(filePath);
+			if (!file) {
+				delete syncState.syncedPosts[articleId];
+				removed++;
+			}
+		}
+
+		return removed;
 	}
 
 	private async ensureFolder(folderPath: string): Promise<void> {

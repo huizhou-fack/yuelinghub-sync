@@ -1,4 +1,4 @@
-export type SyncMode = 'all' | 'collected' | 'group' | 'tag';
+export type SyncMode = 'all' | 'collected' | 'group';
 export type ConflictStrategy = 'skip' | 'overwrite';
 
 export interface YuelingArticle {
@@ -14,6 +14,7 @@ export interface YuelingArticle {
 	word_num: number;
 	type: number;
 	tags: string[];
+	groups: string[];
 	is_collect: boolean;
 	content_raw: string;
 	content_sim: string;
@@ -36,15 +37,8 @@ export interface MetaGroup {
 	name: string;
 }
 
-export interface MetaTag {
-	id: number;
-	name: string;
-	source_id: number;
-}
-
 export interface MetaResponse {
 	groups: MetaGroup[];
-	tags: MetaTag[];
 }
 
 export interface ApiResponse<T> {
