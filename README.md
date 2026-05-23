@@ -72,3 +72,71 @@ Frontmatter 包含 `yueling_id`、`title`、`source`、`url`、`published`、`su
 参考 [Obsidian 插件开发工作流](https://docs.obsidian.md/Plugins/Getting+started/Development+workflow)。
 
 修改源码后运行 `npm run dev`，在 Obsidian 中禁用/启用插件或使用 [Hot-Reload](https://github.com/pjeby/hot-reload) 热重载。
+
+## 更新插件
+
+从 [GitHub Releases](https://github.com/huizhou-fack/yuelinghub-sync/releases) 下载最新版本的 `main.js`、`manifest.json`、`styles.css`，覆盖到 vault 目录：
+
+```
+<Vault>/.obsidian/plugins/yuelinghub-sync/
+```
+
+然后在 Obsidian 中 **Settings → Community plugins** 禁用并重新启用插件，或直接重启 Obsidian。
+
+## 发布新版本（开发者）
+
+本项目使用 [GitHub Actions](https://docs.github.com/en/actions) 自动构建并创建 Release，流程参考 [Obsidian 官方文档](https://docs.obsidian.md/Plugins/Releasing/Release+your+plugin+with+GitHub+Actions)。
+
+### 前置条件
+
+1. 仓库 **Settings → Actions → General → Workflow permissions** 设为 **Read and write permissions**
+2. 本地已配置 GitHub 认证（SSH 或 Personal Access Token）
+
+### 发布步骤
+
+```bash
+# 1. 更新版本号（自动同步 manifest.json 与 versions.json）
+npm version patch   # 1.0.1 → 1.0.2；也可用 minor / major
+
+# 2. 提交并推送代码
+git push origin master
+
+# 3. 推送 tag（tag 必须与 manifest.json 中的 version 完全一致，不要加 v 前缀）
+git push origin 1.0.2
+```
+
+推送 tag 后，GitHub Actions 会自动：
+
+1. 执行 `npm ci && npm run build`
+2. 创建 Draft Release
+3. 上传 `main.js`、`manifest.json`、`styles.css`
+
+最后在 GitHub **Releases** 页面编辑 Draft Release、填写更新说明，点击 **Publish release** 即可。
+
+### 手动发布（备选）
+
+```bash
+npm run build
+```
+
+将生成的 `main.js`、`manifest.json`、`styles.css` 手动上传到 GitHub Release。
+
+## 更新日志
+
+### 1.0.2
+
+- 修复按分组同步时仍拉取全部公众号的问题
+- 修复 `summary` 字段含换行/特殊字符导致笔记属性无法显示
+- 修复删除本地笔记后无法重新同步的问题（自动检测缺失文件并重新拉取）
+- 同步文章 frontmatter 增加 `groups` 分组信息
+- 移除按标签同步模式
+- 状态栏增加 **设置** 快捷入口
+- 新增 **打开同步设置** 命令
+
+### 1.0.1
+
+- 初始发布
+- 支持全部已关注 / 仅收藏 / 按分组同步
+- 完整正文 HTML 转 Markdown + frontmatter 摘要
+- 增量同步、定时同步、冲突策略（跳过/覆盖）
+- 专用阅灵 Obsidian API 对接
