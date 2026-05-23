@@ -1,90 +1,71 @@
-# Obsidian Sample Plugin
+# 阅灵同步（YuelingHub Sync）
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+将专属信息茧房（阅灵）订阅文章同步到 Obsidian vault。
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## 功能
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+- 从阅灵 API 拉取文章并保存为 Markdown
+- 支持多种同步范围：全部已关注、仅收藏、按分组、按标签
+- 增量同步（基于 `post_time`）
+- 完整正文（HTML 转 Markdown）+ frontmatter 摘要
+- 手动同步、定时同步、冲突策略（跳过/覆盖）
 
-## First time developing plugins?
+## 隐私与网络
 
-Quick starting guide for new plugin devs:
+本插件需要访问你配置的阅灵 API 地址（默认 `https://yuelinghub.com`），以拉取你的订阅文章数据。
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+- 用户 token 仅保存在本地 vault 的插件数据中
+- 不会收集或上传 vault 内其他内容
+- 正文中的图片保留远程 URL，不会自动下载
 
-## Releasing new releases
+## 安装
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+1. 将 `main.js`、`manifest.json` 放入 vault 的 `.obsidian/plugins/yuelinghub-sync/` 目录
+2. 在 Obsidian 中启用 **Settings → Community plugins → 阅灵同步**
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+开发构建：
 
-## Adding your plugin to the community plugin list
-
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
-
-## How to use
-
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+```bash
+npm install
+npm run dev   # 监听编译
+npm run build # 生产构建
 ```
 
-If you have multiple URLs, you can also do:
+## 配置
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
+1. 在小程序或 web 管理端获取用户 token（`POST /api/wx/get_token`）
+2. 打开 **Settings → Community plugins → 阅灵同步**
+3. 填写 API 地址和用户令牌
+4. 点击 **验证并刷新** 加载分组/标签
+5. 选择同步模式与目标文件夹
+6. 执行 **立即同步文章** 命令，或点击左侧 ribbon 下载图标
+
+## 同步文件格式
+
+```
+阅灵/{公众号名称}/{YYYY-MM-DD} {标题}.md
 ```
 
-## API Documentation
+Frontmatter 包含 `yueling_id`、`title`、`source`、`url`、`published`、`summary`、`tags` 等字段。
 
-See https://docs.obsidian.md
+## 命令
+
+| 命令 | 说明 |
+|------|------|
+| 立即同步文章 | 手动触发同步 |
+| 重置同步状态 | 清空增量记录，下次重新拉取 |
+| 打开同步目录 | 打开最近同步的文章 |
+
+## 后端 API
+
+插件依赖 wx-pusher-admin 提供的专用接口：
+
+- `POST /api/plugin/obsidian/authorize`
+- `POST /api/plugin/obsidian/meta`
+- `POST /api/plugin/obsidian/articles`
+
+## 开发
+
+参考 [Obsidian 插件开发工作流](https://docs.obsidian.md/Plugins/Getting+started/Development+workflow)。
+
+修改源码后运行 `npm run dev`，在 Obsidian 中禁用/启用插件或使用 [Hot-Reload](https://github.com/pjeby/hot-reload) 热重载。

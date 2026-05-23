@@ -1,99 +1,151 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { Notice, Plugin } from 'obsidian';
+import { registerCommands } from './commands';
+import {
+	DEFAULT_SETTINGS,
+	YuelingSettingTab,
+	YuelingSyncSettings,
+} from './settings';
+import { DEFAULT_SYNC_STATE, SyncState } from './types';
+import { SyncEngine } from './sync/engine';
 
-// Remember to rename these classes and interfaces!
+interface PluginData {
+	settings: YuelingSyncSettings;
+	syncState: SyncState;
+}
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class YuelingSyncPlugin extends Plugin {
+	settings: YuelingSyncSettings = DEFAULT_SETTINGS;
+	syncState: SyncState = { ...DEFAULT_SYNC_STATE };
+	syncEngine!: SyncEngine;
+	statusBarItem: HTMLElement;
+	private autoSyncTimer: number | null = null;
 
 	async onload() {
-		await this.loadSettings();
+		await this.loadPluginData();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		this.syncEngine = new SyncEngine(
+			this.app,
+			() => this.settings,
+			() => this.syncState,
+			(state) => this.saveSyncState(state),
+		);
+
+		this.addRibbonIcon('download', '同步阅灵文章', () => {
+			void this.runSync();
 		});
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
+		this.statusBarItem = this.addStatusBarItem();
+		this.updateStatusBar('就绪');
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			}
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
+		registerCommands(this);
+		this.addSettingTab(new YuelingSettingTab(this.app, this));
+		this.resetAutoSyncInterval();
 	}
 
 	onunload() {
+		if (this.autoSyncTimer !== null) {
+			window.clearInterval(this.autoSyncTimer);
+		}
 	}
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+	showNotice(message: string): void {
+		new Notice(message);
 	}
 
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
+	updateStatusBar(message: string): void {
+		this.statusBarItem.setText(`阅灵: ${message}`);
 	}
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
+	async runSync(): Promise<void> {
+		if (this.syncEngine.isSyncing()) {
+			this.showNotice('同步正在进行中');
+			return;
+		}
+
+		this.updateStatusBar('同步中…');
+		try {
+			const result = await this.syncEngine.sync((message) => {
+				this.updateStatusBar(message);
+			});
+			const summary = `新增 ${result.created}，更新 ${result.updated}，跳过 ${result.skipped}，失败 ${result.failed}`;
+			this.showNotice(`同步完成：${summary}`);
+			this.updateStatusBar(summary);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.showNotice(`同步失败：${message}`);
+			this.updateStatusBar('同步失败');
+		}
 	}
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+	async resetSyncState(): Promise<void> {
+		this.syncState = { ...DEFAULT_SYNC_STATE };
+		await this.savePluginData();
+	}
+
+	openSyncFolder(): void {
+		const folderPath = this.settings.targetFolder;
+		const files = this.app.vault.getMarkdownFiles()
+			.filter((file) => file.path === folderPath || file.path.startsWith(`${folderPath}/`))
+			.sort((a, b) => b.stat.mtime - a.stat.mtime);
+
+		if (files.length === 0) {
+			this.showNotice(`目录 ${folderPath} 中暂无文章，请先同步`);
+			return;
+		}
+
+		const latestFile = files[0];
+		if (!latestFile) {
+			this.showNotice(`目录 ${folderPath} 中暂无文章，请先同步`);
+			return;
+		}
+
+		void this.app.workspace.getLeaf().openFile(latestFile);
+	}
+
+	resetAutoSyncInterval(): void {
+		if (this.autoSyncTimer !== null) {
+			window.clearInterval(this.autoSyncTimer);
+			this.autoSyncTimer = null;
+		}
+
+		const minutes = this.settings.autoSyncIntervalMin;
+		if (minutes <= 0) {
+			return;
+		}
+
+		this.autoSyncTimer = window.setInterval(() => {
+			void this.runSync();
+		}, minutes * 60 * 1000);
+		this.registerInterval(this.autoSyncTimer);
+	}
+
+	async loadSettings(): Promise<void> {
+		await this.loadPluginData();
+	}
+
+	async saveSettings(): Promise<void> {
+		await this.savePluginData();
+		this.resetAutoSyncInterval();
+	}
+
+	async saveSyncState(state: SyncState): Promise<void> {
+		this.syncState = state;
+		await this.savePluginData();
+	}
+
+	private async loadPluginData(): Promise<void> {
+		const data = await this.loadData() as Partial<PluginData> | null;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, data?.settings);
+		this.syncState = Object.assign({}, DEFAULT_SYNC_STATE, data?.syncState);
+		if (data?.syncState?.syncedPosts) {
+			this.syncState.syncedPosts = { ...data.syncState.syncedPosts };
+		}
+	}
+
+	private async savePluginData(): Promise<void> {
+		await this.saveData({
+			settings: this.settings,
+			syncState: this.syncState,
+		});
 	}
 }
