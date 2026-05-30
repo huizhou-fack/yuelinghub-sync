@@ -1,6 +1,6 @@
 {
 	"name": "yuelinghub-sync",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "Sync YuelingHub articles to Obsidian",
 	"main": "main.js",
 	"type": "module",
