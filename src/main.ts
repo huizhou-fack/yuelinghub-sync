@@ -54,8 +54,8 @@ export default class YuelingSyncPlugin extends Plugin {
 			cls: 'yuelinghub-sync-settings-link',
 			text: '设置',
 		});
-		setTooltip(this.statusBarSettings, '打开阅灵同步设置');
-		this.statusBarSettings.setAttr('aria-label', '打开阅灵同步设置');
+		setTooltip(this.statusBarSettings, 'Open Yueling Sync settings');
+		this.statusBarSettings.setAttr('aria-label', 'Open Yueling Sync settings');
 		this.registerDomEvent(this.statusBarSettings, 'click', (event: MouseEvent) => {
 			event.stopPropagation();
 			this.openSettings();

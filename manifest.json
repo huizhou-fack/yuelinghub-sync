@@ -1,9 +1,9 @@
 {
 	"id": "yuelinghub-sync",
-	"name": "阅灵同步",
+	"name": "Yueling Sync",
 	"version": "1.0.2",
 	"minAppVersion": "0.15.0",
-	"description": "将专属信息茧房（阅灵）文章同步到 Obsidian",
+	"description": "Sync articles from YuelingHub into your vault as Markdown notes.",
 	"author": "YuelingHub",
 	"isDesktopOnly": false
 }
