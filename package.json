@@ -1,6 +1,6 @@
 {
 	"name": "yuelinghub-sync",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "Sync articles from YuelingHub into your vault as Markdown notes.",
 	"main": "main.js",
 	"type": "module",
