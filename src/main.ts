@@ -130,7 +130,7 @@ export default class YuelingSyncPlugin extends Plugin {
 			return;
 		}
 
-		void this.app.workspace.openLinkText(latestFile.path, '', false);
+		this.showNotice(`最近同步文章：${latestFile.path}`);
 	}
 
 	resetAutoSyncInterval(): void {
