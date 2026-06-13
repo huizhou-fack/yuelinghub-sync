@@ -1,4 +1,4 @@
-import { Notice, Plugin, setTooltip } from 'obsidian';
+import { Notice, Plugin } from 'obsidian';
 import { registerCommands } from './commands';
 import {
 	DEFAULT_SETTINGS,
@@ -54,7 +54,7 @@ export default class YuelingSyncPlugin extends Plugin {
 			cls: 'yuelinghub-sync-settings-link',
 			text: '设置',
 		});
-		setTooltip(this.statusBarSettings, 'Open Yueling Sync settings');
+		this.statusBarSettings.setAttr('title', 'Open Yueling Sync settings');
 		this.statusBarSettings.setAttr('aria-label', 'Open Yueling Sync settings');
 		this.registerDomEvent(this.statusBarSettings, 'click', (event: MouseEvent) => {
 			event.stopPropagation();
@@ -130,7 +130,7 @@ export default class YuelingSyncPlugin extends Plugin {
 			return;
 		}
 
-		void this.app.workspace.getLeaf().openFile(latestFile);
+		void this.app.workspace.openLinkText(latestFile.path, '', false);
 	}
 
 	resetAutoSyncInterval(): void {

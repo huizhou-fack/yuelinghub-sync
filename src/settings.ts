@@ -38,6 +38,10 @@ export class YuelingSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
+		this.render();
+	}
+
+	private render(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 
@@ -102,7 +106,7 @@ export class YuelingSettingTab extends PluginSettingTab {
 						}
 					}
 					await this.plugin.saveSettings();
-					this.display();
+					this.render();
 				}));
 
 		if (this.plugin.settings.syncMode === 'group') {
@@ -206,7 +210,7 @@ export class YuelingSettingTab extends PluginSettingTab {
 				}
 			}
 			this.plugin.showNotice(`验证成功：${auth.nickname || auth.uid}`);
-			this.display();
+			this.render();
 		} catch (error: unknown) {
 			const message = error instanceof ApiError ? error.message : String(error);
 			this.plugin.showNotice(`验证失败：${message}`);
